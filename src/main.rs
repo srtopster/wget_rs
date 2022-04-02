@@ -19,12 +19,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(1)
     }
     let url = &args[1];
-    let filename: &str;
+    let filename: String;
     if args.len() >= 3{
-        filename = &args[2];
+        filename = format!("{}.{}",&args[2],args[1].split(".").last().unwrap());
     }
     else {
-        filename = &args[1].split("/").last().unwrap();
+        filename = args[1].split("/").last().unwrap().to_owned();
     }
     let resp = reqwest::get(url).await?;
     let size = resp.content_length().unwrap() as f64;
