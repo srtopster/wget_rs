@@ -1,11 +1,9 @@
 use reqwest;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Write,stdout};
 use futures_util::StreamExt;
-use std::io;
+use std::{env,process,path};
 use std::time::Instant;
-use std::env;
-use std::process;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,6 +24,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     else {
         filename = args[1].split("/").last().unwrap().to_owned();
     }
+    if path::Path::new(&filename).exists() {
+        println!("Arquivo existente");
+        println!("Caso queira baixar use: wget <URL> NEW_FILENAME");
+        process::exit(0)
+    }
     let resp = reqwest::get(url).await?;
     let size = resp.content_length().unwrap() as f64;
     let mut stream = resp.bytes_stream();
@@ -40,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         done += chunk.len() as f64;
         let perc = ((done/size)*100.0) as i32;
         print!("\r[{}][{:.2}Mbps]{}%","=".repeat(perc as usize/2)+&" ".repeat(50-perc as usize/2),(done/(old.elapsed().as_secs() as f64))/1048576.0,perc);
-        io::stdout().flush().unwrap();
+        stdout().flush().unwrap();
     }
     Ok(())
 }
