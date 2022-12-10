@@ -5,8 +5,10 @@ use futures_util::StreamExt;
 use std::{env,process,path};
 use std::time::Instant;
 
+const MB_IN_BYTES: f64 = 1048576.0;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() <= 1 {
         println!("Uso: wget URL (filename)");
@@ -25,25 +27,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         filename = args[1].split("/").last().unwrap().to_owned();
     }
     if path::Path::new(&filename).exists() {
-        println!("Arquivo existente");
-        println!("Caso queira baixar use: wget <URL> NEW_FILENAME");
+        println!("Arquivo existente !\nCaso queira baixar use: wget <URL> NEW_FILENAME");
         process::exit(0)
     }
-    let resp = reqwest::get(url).await?;
+
+    let resp = reqwest::get(url).await.unwrap();
     let size = resp.content_length().unwrap() as f64;
     let mut stream = resp.bytes_stream();
 
-    println!("[{:.2}Mb]{}",(size/1048576.0),filename);
-    let mut file = File::create(filename).unwrap();
+    println!("[{:.2}Mb]{}",(size/MB_IN_BYTES),filename);
+    let mut file = File::create(filename).expect("Erro ao criar arquivo");
     let mut done: f64 = 0.0;
     let old = Instant::now();
+
     while let Some(item) = stream.next().await {
-        let chunk = item.or(Err(format!("Erro ao baixar")))?;
-        file.write_all(&chunk).unwrap();
+        let chunk = item.expect("Erro ao baixar");
+        file.write_all(&chunk).expect("Erro ao escrever arquivo");
         done += chunk.len() as f64;
-        let perc = ((done/size)*100.0) as i32;
-        print!("\r[{}][{:.2}Mbps]{}%","=".repeat(perc as usize/2)+&" ".repeat(50-perc as usize/2),(done/(old.elapsed().as_secs() as f64))/1048576.0,perc);
+
+        let perc = ((done/size)*100.0) as usize;
+        let progress_bar = format!("{}>{}","=".repeat(perc/2)," ".repeat(50-perc/2));
+        let bps = done/old.elapsed().as_secs_f64();
+        let eta = ((size-done)/bps)/60.0;
+
+        print!("\r[{}][{:.2}Mbps][{:.2}Min]{}% ",progress_bar,bps/MB_IN_BYTES,eta,perc);
         stdout().flush().unwrap();
     }
-    Ok(())
 }
